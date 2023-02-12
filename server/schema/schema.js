@@ -1,8 +1,36 @@
 const {projects, clients} = require('../sampleData.js');
 const Project = require("../models/Project");
 const Client = require('../models/Client');
-const { GraphQLObjectType, GraphQLID, GraphQLString, GraphQLSchema, GraphQLList, GraphQLNonNull, GraphQLEnumType } = require('graphql');
-const { resolve } = require('patch-package/dist/path.js');
+const Group = require('../models/group-model');
+const User = require('../models/user-model');
+
+const { GraphQLObjectType, GraphQLID, GraphQLInt, GraphQLString, GraphQLSchema, GraphQLList, GraphQLNonNull, GraphQLEnumType, GraphQLFloat } = require('graphql');
+//const { resolve } = require('patch-package/dist/path.js');
+
+const GroupType = new GraphQLObjectType({
+    name: 'Group',
+    fields: () => ({
+        groupName: { type: GraphQLString},
+        className: { type: GraphQLString},
+        classNumber: { type: GraphQLString },
+        email: { type: GraphQLList(GraphQLString) },
+        time: {type: GraphQLString},
+        longitude: {type: GraphQLFloat},
+        latitude: {type: GraphQLFloat}
+    })
+});
+
+const UserType = new GraphQLObjectType({
+    name: 'User',
+    fields: () => ({
+        userName: { type: GraphQLString},
+        firstName: { type: GraphQLString},
+        lastName: { type: GraphQLString},
+        email: { type: GraphQLString},
+        passwordHash: { type: GraphQLString},
+        groups: {type: GraphQLList(GraphQLString)}
+    })
+});
 
 const ClientType = new GraphQLObjectType({
     name: 'Client',
@@ -33,6 +61,72 @@ const ProjectType = new GraphQLObjectType({
 const mutation = new GraphQLObjectType({
     name: 'Mutation',
     fields: {
+        register:{
+            type: UserType,
+            args: {
+                userName: { type: GraphQLString},
+                firstName: { type: GraphQLString},
+                lastName: { type: GraphQLString},
+                email: { type: GraphQLString},
+                passwordHash: { type: GraphQLString},
+            },
+            resolve(parent, args){
+                return User.create({
+                    userName: args.userName,
+                    firstName: args.firstName,
+                    lastName: args.lastName,
+                    email: args.email,
+                    passwordHash: args.passwordHash,
+                    groups: []
+                });
+            }
+        },
+        addGroup:{
+            type: GroupType,
+            args: {
+                groupName: { type: GraphQLString},
+                className: { type: GraphQLString},
+                classNumber: { type: GraphQLString},
+                email: { type: GraphQLString},
+                time: { type: GraphQLString },
+                longitude: { type: GraphQLFloat },
+                latitude: { type: GraphQLFloat }
+            },
+            resolve(parent, args){
+                return Group.create({
+                    groupName: args.groupName,
+                    className: args.className,
+                    classNumber: args.classNumber,
+                    email: args.email,
+                    time: args.time,
+                    longitude: args.longitude,
+                    latitude: args.latitude
+                });
+            }
+        },
+        addtoGroup:{
+            type: GroupType,
+            args: {
+                groupName: { type: GraphQLString},
+                email: { type: GraphQLString},
+            },
+            resolve(parent, args){
+                return Group.findOne({groupName: args.groupName}).then(doc => {
+                    doc.email.push(args.email);
+                    doc.save();
+                    return doc;
+                })
+            }
+        },
+        deleteGroup:{
+            type: GroupType,
+            args: {
+                groupName: { type: GraphQLString},
+            },
+            resolve(parent, args){
+                return Group.findOneAndDelete({groupName: args.groupName});
+            }
+        },
         addClient:{
             type: ClientType,
             args: {
@@ -136,30 +230,30 @@ const mutation = new GraphQLObjectType({
 const RootQuery = new GraphQLObjectType({
     name: 'RootQueryType',
     fields: {
-        projects:{
-            type: GraphQLList(ProjectType),
+        groups: {
+            type: GraphQLList(GroupType),
             resolve(parent, args){
-                return Project.find();
+                return Group.find();
             }
         },
-        project: {
-            type: ProjectType,
+        group_by_class: {
+            type: GraphQLList(GroupType),
+            args:{
+                className: {type: GraphQLString},
+                classNumber: {type: GraphQLString}
+            },
             resolve(parent, args){
-                return Project.findById(args.id);
+                console.log(args);
+                return Group.find({'$and': [{className: 'AMS', classNumber: '101'}]});
             }
-            
         },
-        clients:{
-            type: GraphQLList(ClientType),
+        login: {
+            type: UserType,
+            args: {
+                userName: {type: GraphQLString}
+            },
             resolve(parent, args){
-                return Client.find();
-            }
-            
-        },
-        client: {
-            type: ClientType,
-            resolve(parent, args){
-                return Client.findById(args.id);
+                return User.find({userName: args.userName});
             }
         }
     }
